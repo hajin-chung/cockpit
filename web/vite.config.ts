@@ -8,9 +8,10 @@ export default defineConfig({
 		emptyOutDir: true,
 	},
 	server: {
-		port: 4000,
+		port: 4001,
 		host: "0.0.0.0",
 		allowedHosts: true,
 	},
 	plugins: [solid(), tailwindcss()],
+	clearScreen: false,
 });

@@ -19,6 +19,7 @@ func main() {
 
 	e.Use(middleware.Logger())
 	e.Use(middleware.Recover())
+	e.Use(middleware.CORSWithConfig(middleware.DefaultCORSConfig))
 	e.Use(CockpitContextMiddleware(runner, db))
 	e.Static("/", "static")
 

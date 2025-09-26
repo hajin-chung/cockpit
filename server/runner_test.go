@@ -2,6 +2,7 @@ package main
 
 import (
 	"log/slog"
+	"sync"
 	"testing"
 )
 
@@ -10,7 +11,7 @@ type MockDB struct{}
 func (db *MockDB) NewCommand(command string) (*CommandInfo, error) {
 	commandInfo := CommandInfo{
 		Id:        IdGen(),
-		CreatedAt: FormatNow(), 
+		CreatedAt: FormatNow(),
 		Status:    COMMAND_IDLE,
 		Command:   command,
 	}
@@ -46,7 +47,8 @@ func TestRunner(t *testing.T) {
 
 	// commandInfo, err := db.NewCommand("tail -f /mnt/d/vod/memo.dat")
 	// commandInfo, err := db.NewCommand("ls -alh /mnt/d/vod")
-	commandInfo, err := db.NewCommand("ls -alh")
+	// commandInfo, err := db.NewCommand("ls -alh")
+	commandInfo, err := db.NewCommand("while true; do date; sleep 1; done")
 	if err != nil {
 		t.Errorf("db NewCommand error: %s\n", err)
 	}
@@ -54,9 +56,39 @@ func TestRunner(t *testing.T) {
 	runner.Run(db, commandInfo)
 
 	id := commandInfo.Id
-	pipeOut := runner.AddConsumer(id)
-	for log := range pipeOut {
-		slog.Info("[OUT]", "content", log.Content, "time", log.CreatedAt)
-	}
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	go func() {
+		defer wg.Done()
+		rc, err := runner.AddConsumer(id)
+		if err != nil {
+			t.Errorf("runner.AddConsumer error: %s\n", err)
+			return
+		}
+		for log := range rc {
+			slog.Info("[OUT]", "content", log.Content, "time", log.CreatedAt)
+		}
+	}()
+
+	go func() {
+		defer wg.Done()
+		rc, err := runner.AddConsumer(id)
+		if err != nil {
+			t.Errorf("runner.AddConsumer error: %s\n", err)
+			return
+		}
+		cnt := 0
+		for log := range rc {
+			cnt += 1
+			slog.Info("[OUT]", "content", log.Content, "time", log.CreatedAt)
+			if cnt > 5 {
+				runner.CloseConsumer(id, rc)
+				return
+			}
+		}
+	}()
+
+	wg.Wait()
 }
 

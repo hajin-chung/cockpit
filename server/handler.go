@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"errors"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -18,21 +17,24 @@ type NewCommand struct {
 func NewCommandHandler(c echo.Context) error {
 	cc := c.(*CockpitContext)
 	newCommand := new(NewCommand)
-	if err := c.Bind(newCommand); err != nil {
-		return err
+	if err := cc.Bind(newCommand); err != nil {
+		slog.Error("NewCommandHandler cc.Bind", "error", err)
+		return cc.String(http.StatusBadRequest, "invalid json format");
 	}
 
 	commandInfo, err := cc.DB.NewCommand(newCommand.Command)
 	if err != nil {
-		return err
+		slog.Error("NewCommandHandler cc.DB.NewCommand", "error", err)
+		return cc.String(http.StatusInternalServerError, "db fail");
 	}
 
 	err = cc.Runner.Run(cc.DB, commandInfo)
 	if err != nil {
-		return err
+		slog.Error("NewCommandHandler cc.Runner.Run", "error", err)
+		return cc.String(http.StatusInternalServerError, "runner fail");
 	}
 
-	return c.JSON(http.StatusCreated, commandInfo)
+	return cc.JSON(http.StatusCreated, commandInfo)
 }
 
 func GetCommandHandler(c echo.Context) error {
@@ -41,9 +43,10 @@ func GetCommandHandler(c echo.Context) error {
 	commandId := cc.Param("id")
 	info, err := cc.DB.GetCommand(commandId)
 	if err != nil {
-		return nil
+		slog.Error("GetCommandHandler cc.DB.GetCommand", "error", err)
+		return cc.String(http.StatusInternalServerError, "db fail");
 	}
-	return c.JSON(http.StatusOK, info)
+	return cc.JSON(http.StatusOK, info)
 }
 
 func ListCommandHandler(c echo.Context) error {
@@ -52,18 +55,19 @@ func ListCommandHandler(c echo.Context) error {
 	before := cc.QueryParam("before")
 	limit, err := strconv.Atoi(cc.QueryParam("limit"))
 	if err != nil{
-		return err
+		return cc.String(http.StatusBadRequest, "invalid limit param");
 	}
 	if limit < 0 {
-		return errors.New("negative limit")
+		return cc.String(http.StatusBadRequest, "negative limit param");
 	}
 
 	commands, err := cc.DB.ListCommands(before, uint(limit))
 	if err != nil {
-		return err
+		slog.Error("ListCommandHandler cc.DB.ListCommand", "error", err)
+		return cc.String(http.StatusInternalServerError, "db fail");
 	}
 
-	return c.JSON(http.StatusOK, commands)
+	return cc.JSON(http.StatusOK, commands)
 }
 
 func LogHandler(c echo.Context) error {
@@ -72,25 +76,30 @@ func LogHandler(c echo.Context) error {
 	before := cc.QueryParam("before")
 	limit, err := strconv.Atoi(cc.QueryParam("limit"))
 	if err != nil{
-		return err
+		return cc.String(http.StatusBadRequest, "invalid limit param");
 	}
 	if limit < 0 {
-		return errors.New("negative limit")
+		return cc.String(http.StatusBadRequest, "negative limit param");
 	}
 
 	logs, err := cc.DB.GetLogs(commandId, before, uint(limit))
 	if err != nil {
-		return err
+		slog.Error("LogHandler cc.DB.GetLogs", "error", err)
+		return cc.String(http.StatusInternalServerError, "db fail");
 	}
 
-	return c.JSON(http.StatusOK, logs)
+	return cc.JSON(http.StatusOK, logs)
 }
 
 func LogStreamHandler(c echo.Context) error {
 	cc := c.(*CockpitContext)
 	commandId := cc.Param("id")
 
-	rc := cc.Runner.AddConsumer(commandId)
+	rc, err := cc.Runner.AddConsumer(commandId)
+	if err != nil {
+		slog.Error("LogStreamHandler cc.Runner.AddConsumer", "error", err)
+		return cc.String(http.StatusInternalServerError, "runner fail");
+	}
 
 	w := cc.Response()
 	w.Header().Set("Content-Type", "text/event-stream")
@@ -99,7 +108,8 @@ func LogStreamHandler(c echo.Context) error {
 
 	for {
 		select {
-		case <-c.Request().Context().Done():
+		case <-cc.Request().Context().Done():
+			cc.Runner.CloseConsumer(commandId, rc)
 			return nil
 		case log := <-rc:
 			data, err := json.Marshal(log)

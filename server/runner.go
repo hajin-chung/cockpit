@@ -2,21 +2,24 @@ package main
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
 	"os/exec"
+	"slices"
 	"sync"
 )
 
 type Runner interface {
 	Run(db DB, commandInfo *CommandInfo) error
-	AddConsumer(commandId string) <-chan *CommandLog
+	AddConsumer(commandId string) (chan *CommandLog, error)
+	CloseConsumer(commandId string, c chan *CommandLog) error 
 }
 
 type Session struct {
 	*CommandInfo
-	Consumers []chan<- *CommandLog
+	Consumers []chan *CommandLog
 }
 
 type CockpitRunner struct {
@@ -34,10 +37,10 @@ func NewRunner() Runner {
 func (r *CockpitRunner) Run(db DB, commandInfo *CommandInfo) error {
 	cmd := exec.Command("bash", "-c", commandInfo.Command)
 
-	consumers := make([]chan<- *CommandLog, 0)
-	session := &Session {
+	consumers := make([]chan *CommandLog, 0)
+	session := &Session{
 		CommandInfo: commandInfo,
-		Consumers: consumers,
+		Consumers:   consumers,
 	}
 	r.Sessions[commandInfo.Id] = session
 
@@ -63,15 +66,38 @@ func (r *CockpitRunner) Run(db DB, commandInfo *CommandInfo) error {
 	return nil
 }
 
-func (r *CockpitRunner) AddConsumer(commandId string) <-chan *CommandLog {
-	c := r.Sessions[commandId].AddConsumer()
-	return c
+func (r *CockpitRunner) AddConsumer(commandId string) (chan *CommandLog, error) {
+	session := r.Sessions[commandId]
+	if session == nil {
+		return nil, fmt.Errorf("no command with commandId %s", commandId)
+	}
+	c, err := session.AddConsumer()
+	return c, err
 }
 
-func (s *Session) AddConsumer() <-chan *CommandLog {
+func (r *CockpitRunner) CloseConsumer(commandId string, c chan *CommandLog) error {
+	session := r.Sessions[commandId]
+	if session == nil {
+		return fmt.Errorf("no command with commandId %s", commandId)
+	}
+	err := session.CloseConsumer(c)
+	return err
+}
+
+func (s *Session) AddConsumer() (chan *CommandLog, error) {
+	if s.Status != COMMAND_RUNNING && s.Status != COMMAND_IDLE {
+		return nil, errors.New("command closed")
+	}
 	c := make(chan *CommandLog)
 	s.Consumers = append(s.Consumers, c)
-	return c
+	return c, nil
+}
+
+func (s *Session) CloseConsumer(c chan *CommandLog) error {
+	s.Consumers = slices.DeleteFunc(s.Consumers, func(cc chan *CommandLog) bool {
+		return cc == c
+	})
+	return nil
 }
 
 func SplitLines(buf []byte) ([]string, int) {
@@ -80,7 +106,7 @@ func SplitLines(buf []byte) ([]string, int) {
 	for i, b := range buf {
 		if b == '\n' {
 			bufline := make([]byte, i-idx)
-			copy(bufline, buf[idx: i])
+			copy(bufline, buf[idx:i])
 			lines = append(lines, string(bufline))
 			idx = i + 1
 		}
@@ -95,12 +121,12 @@ func (s *Session) Drainer(wg *sync.WaitGroup, commandInfo *CommandInfo, reader i
 
 	for scanner.Scan() {
 		line := scanner.Text()
-		commandLog := &CommandLog {
-			Id: IdGen(),
+		commandLog := &CommandLog{
+			Id:        IdGen(),
 			CommandId: s.Id,
 			CreatedAt: FormatNow(),
-			Content: line,
-			FD: fd,
+			Content:   line,
+			FD:        fd,
 		}
 		slog.Info("[IN] ", "content", line, "time", commandLog.CreatedAt)
 		for _, c := range s.Consumers {
@@ -115,7 +141,10 @@ func (s *Session) Drainer(wg *sync.WaitGroup, commandInfo *CommandInfo, reader i
 
 // write log to db
 func (s *Session) Logger(db DB, commandInfo *CommandInfo) {
-	c := s.AddConsumer()
+	c, err := s.AddConsumer()
+	if err != nil {
+		slog.Error("Logger", "error", err)
+	}
 	for log := range c {
 		db.AddLog(log)
 	}

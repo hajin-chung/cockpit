@@ -27,18 +27,18 @@ const (
 )
 
 type CommandInfo struct {
-	Id        string
-	CreatedAt string
-	Command   string
-	Status    CommandStatus
+	Id        string        `json:"id"`
+	CreatedAt string        `json:"createdAt"`
+	Command   string        `json:"command"`
+	Status    CommandStatus `json:"status"`
 }
 
 type CommandLog struct {
-	Id        string
-	CommandId string
-	CreatedAt string
-	Content   string
-	FD        LogFD
+	Id        string `json:"id"`
+	CommandId string `json:"commandId"`
+	CreatedAt string `json:"createdAt"`
+	Content   string `json:"content"`
+	FD        LogFD  `json:"fd"`
 }
 
 type DB interface {
@@ -98,7 +98,7 @@ VALUES (?, ?, ?, ?);
 const SELECT_COMMAND_QUERY = `
 SELECT id, created_at, command, status
 FROM command
-WHERE id = %1;
+WHERE id = $1;
 `
 const LIST_COMMAND_QUERY = `
 SELECT id, created_at, command, status 
@@ -188,7 +188,7 @@ func (db *CockpitDB) ListCommands(before string, n uint) ([]CommandInfo, error) 
 	}
 	defer rows.Close()
 
-	var commands []CommandInfo
+	commands := []CommandInfo{}
 	for rows.Next() {
 		var c CommandInfo
 		err := rows.Scan(&c.Id, &c.CreatedAt, &c.Command, &c.Status)
@@ -232,7 +232,7 @@ func (db *CockpitDB) GetLogs(commandId string, before string, n uint) ([]Command
 		return nil, err
 	}
 
-	var logs []CommandLog
+	logs := []CommandLog{}
 	for rows.Next() {
 		var l CommandLog
 		err := rows.Scan(&l.Id, &l.CommandId, &l.CreatedAt, &l.Content, &l.FD)
