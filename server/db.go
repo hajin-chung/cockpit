@@ -26,14 +26,14 @@ const (
 	LOG_ERROR  LogFD = -1
 )
 
-type CommandInfo struct {
+type Command struct {
 	Id        string        `json:"id"`
 	CreatedAt string        `json:"createdAt"`
 	Command   string        `json:"command"`
 	Status    CommandStatus `json:"status"`
 }
 
-type CommandLog struct {
+type Log struct {
 	Id        string `json:"id"`
 	CommandId string `json:"commandId"`
 	CreatedAt string `json:"createdAt"`
@@ -42,11 +42,11 @@ type CommandLog struct {
 }
 
 type DB interface {
-	NewCommand(command string) (*CommandInfo, error)
-	GetCommand(id string) (*CommandInfo, error)
-	ListCommands(before string, n uint) ([]CommandInfo, error)
-	AddLog(log *CommandLog) error
-	GetLogs(commandId string, before string, n uint) ([]CommandLog, error)
+	NewCommand(command string) (*Command, error)
+	GetCommand(id string) (*Command, error)
+	ListCommands(before string, n uint) ([]Command, error)
+	AddLog(log *Log) error
+	GetLogs(commandId string, before string, n uint) ([]Log, error)
 	UpdateStatus(id string, status CommandStatus) error
 }
 
@@ -147,7 +147,7 @@ func (db *CockpitDB) Init() error {
 	return nil
 }
 
-func (db *CockpitDB) NewCommand(command string) (*CommandInfo, error) {
+func (db *CockpitDB) NewCommand(command string) (*Command, error) {
 	id := IdGen()
 	createdAt := FormatNow()
 	status := COMMAND_IDLE
@@ -157,7 +157,7 @@ func (db *CockpitDB) NewCommand(command string) (*CommandInfo, error) {
 		return nil, err
 	}
 
-	commandInfo := CommandInfo{
+	commandInfo := Command{
 		Id:        id,
 		CreatedAt: createdAt,
 		Command:   command,
@@ -166,8 +166,8 @@ func (db *CockpitDB) NewCommand(command string) (*CommandInfo, error) {
 	return &commandInfo, nil
 }
 
-func (db *CockpitDB) GetCommand(id string) (*CommandInfo, error) {
-	var c CommandInfo
+func (db *CockpitDB) GetCommand(id string) (*Command, error) {
+	var c Command
 
 	row := db.QueryRow(SELECT_COMMAND_QUERY, id)
 	if err := row.Scan(&c.Id, &c.CreatedAt, &c.Command, &c.Status); err != nil {
@@ -176,7 +176,7 @@ func (db *CockpitDB) GetCommand(id string) (*CommandInfo, error) {
 	return &c, nil
 }
 
-func (db *CockpitDB) ListCommands(before string, n uint) ([]CommandInfo, error) {
+func (db *CockpitDB) ListCommands(before string, n uint) ([]Command, error) {
 	// TODO: think about after and n
 	if len(before) == 0 {
 		before = MAX_ID
@@ -188,9 +188,9 @@ func (db *CockpitDB) ListCommands(before string, n uint) ([]CommandInfo, error) 
 	}
 	defer rows.Close()
 
-	commands := []CommandInfo{}
+	commands := []Command{}
 	for rows.Next() {
-		var c CommandInfo
+		var c Command
 		err := rows.Scan(&c.Id, &c.CreatedAt, &c.Command, &c.Status)
 		if err != nil {
 			slog.Error("ListCommands", "error", err)
@@ -206,7 +206,7 @@ func (db *CockpitDB) ListCommands(before string, n uint) ([]CommandInfo, error) 
 	return commands, nil
 }
 
-func (db *CockpitDB) AddLog(log *CommandLog) error {
+func (db *CockpitDB) AddLog(log *Log) error {
 	id := log.Id
 	commandId := log.CommandId
 	createdAt := log.CreatedAt
@@ -222,7 +222,7 @@ func (db *CockpitDB) AddLog(log *CommandLog) error {
 	return nil
 }
 
-func (db *CockpitDB) GetLogs(commandId string, before string, n uint) ([]CommandLog, error) {
+func (db *CockpitDB) GetLogs(commandId string, before string, n uint) ([]Log, error) {
 	if len(before) == 0 {
 		before = MAX_ID
 	}
@@ -232,9 +232,9 @@ func (db *CockpitDB) GetLogs(commandId string, before string, n uint) ([]Command
 		return nil, err
 	}
 
-	logs := []CommandLog{}
+	logs := []Log{}
 	for rows.Next() {
-		var l CommandLog
+		var l Log
 		err := rows.Scan(&l.Id, &l.CommandId, &l.CreatedAt, &l.Content, &l.FD)
 		if err != nil {
 			slog.Error("GetLogs", "error", err)

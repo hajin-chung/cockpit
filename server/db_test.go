@@ -18,7 +18,7 @@ func TestDB(t *testing.T) {
 		}
 	}()
 
-	var info *CommandInfo
+	var info *Command
 	t.Run("db command", func(t *testing.T) {
 		info = testDBCommand(t, db)	
 	})
@@ -28,7 +28,7 @@ func TestDB(t *testing.T) {
 	})
 }
 
-func testDBCommand(t *testing.T, db DB) *CommandInfo {
+func testDBCommand(t *testing.T, db DB) *Command {
 	info, err := db.NewCommand("ls -alh")
 	if err != nil {
 		t.Fatalf("NewCommand error: %s\n", err)
@@ -55,8 +55,8 @@ func testDBCommand(t *testing.T, db DB) *CommandInfo {
 	return info
 }
 
-func testDBLog(t *testing.T, db DB, info *CommandInfo) {
-	log := &CommandLog {
+func testDBLog(t *testing.T, db DB, info *Command) {
+	log := &Log {
 		Id: IdGen(),
 		CommandId: info.Id,
 		CreatedAt: FormatNow(),

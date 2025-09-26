@@ -8,7 +8,8 @@ import (
 )
 
 func main() {
-	var runner Runner = NewRunner()
+	bus := NewEventBus()
+	runner := NewRunner()
 	db, err := NewDB("file:cockpit.db")
 	if err != nil {
 		slog.Error("failed to init db", "error", err)
@@ -20,7 +21,7 @@ func main() {
 	e.Use(middleware.Logger())
 	e.Use(middleware.Recover())
 	e.Use(middleware.CORSWithConfig(middleware.DefaultCORSConfig))
-	e.Use(CockpitContextMiddleware(runner, db))
+	e.Use(CockpitContextMiddleware(runner, db, bus))
 	e.Static("/", "static")
 
 	e.GET("/test/sse", TestSSE)

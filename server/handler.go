@@ -28,7 +28,7 @@ func NewCommandHandler(c echo.Context) error {
 		return cc.String(http.StatusInternalServerError, "db fail");
 	}
 
-	err = cc.Runner.Run(cc.DB, commandInfo)
+	err = cc.Runner.Run(cc.DB, cc.Bus, commandInfo)
 	if err != nil {
 		slog.Error("NewCommandHandler cc.Runner.Run", "error", err)
 		return cc.String(http.StatusInternalServerError, "runner fail");
@@ -95,7 +95,7 @@ func LogStreamHandler(c echo.Context) error {
 	cc := c.(*CockpitContext)
 	commandId := cc.Param("id")
 
-	rc, err := cc.Runner.AddConsumer(commandId)
+	rc, unsub, err := SubChan[*Log](cc.Bus, commandId)
 	if err != nil {
 		slog.Error("LogStreamHandler cc.Runner.AddConsumer", "error", err)
 		return cc.String(http.StatusInternalServerError, "runner fail");
@@ -109,7 +109,7 @@ func LogStreamHandler(c echo.Context) error {
 	for {
 		select {
 		case <-cc.Request().Context().Done():
-			cc.Runner.CloseConsumer(commandId, rc)
+			unsub()
 			return nil
 		case log := <-rc:
 			data, err := json.Marshal(log)
