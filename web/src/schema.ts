@@ -11,14 +11,14 @@ enum LogFD {
 	ERROR = -1,
 }
 
-type CommandInfo = {
+type Command = {
 	id: string;
 	createdAt: string;
 	command: string;
 	status: CommandStatus;
 };
 
-type CommandLog = {
+type Log = {
 	id: string;
 	commandId: string;
 	createdAt: string;
@@ -26,4 +26,4 @@ type CommandLog = {
 	fd: LogFD;
 };
 
-export type { CommandLog, CommandInfo, CommandStatus, LogFD };
+export type { Log, Command, CommandStatus, LogFD };

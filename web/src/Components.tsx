@@ -1,23 +1,43 @@
 import {
-	onMount,
 	createSignal,
 	createEffect,
 	createMemo,
 	type Component,
-    onCleanup,
+	onCleanup,
 } from "solid-js";
 import { A } from "@solidjs/router";
 import * as api from "./api";
-import type { CommandInfo, CommandLog } from "./schema";
+import type { Command, Log } from "./schema";
 
 function CommandList() {
-	const [commandList, setCommandList] = createSignal<CommandInfo[]>([]);
+	const [commandList, setCommandList] = createSignal<Command[]>([]);
 
-	onMount(() => {
-		api
-			.getCommandList("", 50)
-			.then((cl) => setCommandList(cl))
-			.catch((e) => console.error(e));
+	createEffect(() => {
+		const stream = createMemo(() =>
+			api.createStream<Command>(`${api.API_ENDPOINT}/api/v1/command/stream`),
+		);
+
+		(async () => {
+			const prevCommands = await api.getCommandList("", 50);
+			setCommandList(prevCommands);
+
+			for await (const command of stream().iterator) {
+				setCommandList((prevCommands) => {
+					const idx = prevCommands.findIndex((c) => c.id === command.id);
+					console.log(idx, prevCommands, command);
+					if (idx < 0) {
+						return [command, ...prevCommands];
+					} else {
+						prevCommands[idx].status = command.status;
+						return [...prevCommands];
+					}
+				});
+			}
+		})();
+
+		onCleanup(() => {
+			stream().source.close();
+		});
 	});
 
 	return (
@@ -49,11 +69,15 @@ type LogListProps = {
 };
 
 const LogList: Component<LogListProps> = ({ commandId }) => {
-	const [logs, setLogs] = createSignal<CommandLog[]>([]);
+	const [logs, setLogs] = createSignal<Log[]>([]);
 
 	createEffect(() => {
 		const id = commandId();
-		const stream = createMemo(() => api.createLogStream(id));
+		const stream = createMemo(() =>
+			api.createStream<Log>(
+				`${api.API_ENDPOINT}/api/v1/command/${id}/log/stream`,
+			),
+		);
 
 		(async () => {
 			const prevLogs = await api.getLog(commandId(), "", 50);

@@ -6,6 +6,8 @@ command runner with logs
 # TODO
 
 - [x] implement event bus for better pub sub stuff
-- [ ] better serverside cleanup
 - [x] better pub sub api
-- [ ] stream command events (new command, status update)
+- [x] stream command events (new command, status update)
+- [ ] web infinite scroll + sticky scroll
+- [ ] better serverside cleanup
+- [ ] think about better command event message type, go's type system is a bit weak compared to rust

@@ -1,4 +1,4 @@
-import type { CommandInfo, CommandLog } from "./schema";
+import type { Command, Log } from "./schema";
 
 type NewCommand = {
 	command: string;
@@ -6,7 +6,7 @@ type NewCommand = {
 
 const API_ENDPOINT = import.meta.env.DEV ? "https://dev1.deps.me" : "";
 
-async function createCommand(command: string): Promise<CommandInfo> {
+async function createCommand(command: string): Promise<Command> {
 	const payload: NewCommand = { command };
 	const res = await fetch(`${API_ENDPOINT}/api/v1/command/new`, {
 		method: "POST",
@@ -19,7 +19,7 @@ async function createCommand(command: string): Promise<CommandInfo> {
 	return res.json();
 }
 
-async function getCommand(id: string): Promise<CommandInfo> {
+async function getCommand(id: string): Promise<Command> {
 	const res = await fetch(`${API_ENDPOINT}/api/v1/command/${id}`);
 	if (!res.ok) {
 		throw new Error("Failed to get command");
@@ -30,7 +30,7 @@ async function getCommand(id: string): Promise<CommandInfo> {
 async function getCommandList(
 	before: string,
 	limit: number,
-): Promise<CommandInfo[]> {
+): Promise<Command[]> {
 	const res = await fetch(
 		`${API_ENDPOINT}/api/v1/command/list?before=${before}&limit=${limit}`,
 	);
@@ -44,7 +44,7 @@ async function getLog(
 	id: string,
 	before: string,
 	limit: number,
-): Promise<CommandLog[]> {
+): Promise<Log[]> {
 	const res = await fetch(
 		`${API_ENDPOINT}/api/v1/command/${id}/log?before=${before}&limit=${limit}`,
 	);
@@ -54,27 +54,24 @@ async function getLog(
 	return res.json();
 }
 
-type LogStream = {
-	iterator: AsyncIterable<CommandLog>,
+type Stream<T> = {
+	iterator: AsyncIterable<T>,
 	source: EventSource,
 };
 
-function createLogStream(id: string): LogStream {
-	const eventSource = new EventSource(
-		`${API_ENDPOINT}/api/v1/command/${id}/log/stream`,
-	);
-
-	const queue: CommandLog[] = [];
-	let resolve: ((v: IteratorResult<CommandLog>) => void) | null = null;
+function createStream<T>(sourceUrl: string): Stream<T> {
+	const eventSource = new EventSource(sourceUrl);
+	const queue: T[] = [];
+	let resolve: ((v: IteratorResult<T>) => void) | null = null;
 
 	eventSource.onmessage = (evt) => {
 		try {
-			const log = JSON.parse(evt.data) as CommandLog;
+			const value = JSON.parse(evt.data) as T;
 			if (resolve) {
-				resolve({ value: log, done: false });
+				resolve({ value, done: false });
 				resolve = null;
 			} else {
-				queue.push(log);
+				queue.push(value);
 			}
 		} catch (e) {
 			console.error("failed to parse SSE message: ", e);
@@ -91,10 +88,10 @@ function createLogStream(id: string): LogStream {
 		}
 	};
 
-	const iterator: AsyncIterable<CommandLog> = {
+	const iterator: AsyncIterable<T> = {
 		[Symbol.asyncIterator]() {
 			return {
-				next(): Promise<IteratorResult<CommandLog>> {
+				next(): Promise<IteratorResult<T>> {
 					return new Promise((r) => {
 						if (queue.length > 0) {
 							// If there's a queued value, return it immediately.
@@ -112,4 +109,4 @@ function createLogStream(id: string): LogStream {
 	return { iterator, source: eventSource };
 }
 
-export { createCommand, getCommand, getCommandList, getLog, createLogStream };
+export { createCommand, getCommand, getCommandList, getLog, createStream, API_ENDPOINT };
