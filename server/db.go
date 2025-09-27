@@ -52,9 +52,10 @@ type DB interface {
 
 type CockpitDB struct {
 	*sql.DB
+	Bus *EventBus
 }
 
-func NewDB(dataSourceName string) (DB, error) {
+func NewDB(dataSourceName string, bus *EventBus) (DB, error) {
 	dataSourceName += "?_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)"
 	sqlDB, err := sql.Open("sqlite", dataSourceName)
 	if err != nil {
@@ -63,7 +64,8 @@ func NewDB(dataSourceName string) (DB, error) {
 	}
 
 	db := CockpitDB{
-		sqlDB,
+		DB: sqlDB,
+		Bus: bus,
 	}
 	err = db.Init()
 	if err != nil {
@@ -167,6 +169,15 @@ func (db *CockpitDB) NewCommand(command string) (*Command, error) {
 	return &commandInfo, nil
 }
 
+func (db *CockpitDB) UpdateStatus(id string, status CommandStatus) error {
+	_, err := db.Exec(UPDATE_STATUS_QUERY, status, id)
+	if err != nil {
+		slog.Error("failed to update status", "error", err)
+		return err
+	}
+	return nil
+}
+
 func (db *CockpitDB) GetCommand(id string) (*Command, error) {
 	var c Command
 
@@ -249,14 +260,5 @@ func (db *CockpitDB) GetLogs(commandId string, before string, n uint) ([]Log, er
 		return logs, err
 	}
 	return logs, nil
-}
-
-func (db *CockpitDB) UpdateStatus(id string, status CommandStatus) error {
-	_, err := db.Exec(UPDATE_STATUS_QUERY, status, id)
-	if err != nil {
-		slog.Error("failed to update status", "error", err)
-		return err
-	}
-	return nil
 }
 

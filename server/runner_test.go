@@ -43,52 +43,52 @@ func (db *MockDB) GetLogs(commandId string, before string, n uint) ([]Log, error
 
 func TestRunner(t *testing.T) {
 	bus := NewEventBus()
-	runner := NewRunner()
+	runner := NewRunner(bus)
 	db := &MockDB{}
 
 	// commandInfo, err := db.NewCommand("tail -f /mnt/d/vod/memo.dat")
 	// commandInfo, err := db.NewCommand("ls -alh /mnt/d/vod")
 	// commandInfo, err := db.NewCommand("ls -alh")
-	commandInfo, err := db.NewCommand("while true; do date; sleep 1; done")
+	command, err := db.NewCommand("while true; do date; sleep 1; done")
 	if err != nil {
 		t.Errorf("db NewCommand error: %s\n", err)
 	}
 
-	runner.Run(db, bus, commandInfo)
+	runner.Run(db, command)
 
 	// id := commandInfo.Id
 	var wg sync.WaitGroup
 	wg.Add(2)
 
-	// go func() {
-	// 	defer wg.Done()
-	// 	rc, err := runner.AddConsumer(id)
-	// 	if err != nil {
-	// 		t.Errorf("runner.AddConsumer error: %s\n", err)
-	// 		return
-	// 	}
-	// 	for log := range rc {
-	// 		slog.Info("[OUT]", "content", log.Content, "time", log.CreatedAt)
-	// 	}
-	// }()
-	//
-	// go func() {
-	// 	defer wg.Done()
-	// 	rc, err := runner.AddConsumer(id)
-	// 	if err != nil {
-	// 		t.Errorf("runner.AddConsumer error: %s\n", err)
-	// 		return
-	// 	}
-	// 	cnt := 0
-	// 	for log := range rc {
-	// 		cnt += 1
-	// 		slog.Info("[OUT]", "content", log.Content, "time", log.CreatedAt)
-	// 		if cnt > 5 {
-	// 			runner.CloseConsumer(id, rc)
-	// 			return
-	// 		}
-	// 	}
-	// }()
+	go func() {
+		defer wg.Done()
+		rc, _, err := SubChan[*Log](bus, command.Id)
+		if err != nil {
+			t.Errorf("runner.AddConsumer error: %s\n", err)
+			return
+		}
+		for log := range rc {
+			slog.Info("[OUT]", "content", log.Content, "time", log.CreatedAt)
+		}
+	}()
+
+	go func() {
+		defer wg.Done()
+		rc, unsub, err := SubChan[*Log](bus, command.Id)
+		if err != nil {
+			t.Errorf("runner.AddConsumer error: %s\n", err)
+			return
+		}
+		cnt := 0
+		for log := range rc {
+			cnt += 1
+			slog.Info("[OUT]", "content", log.Content, "time", log.CreatedAt)
+			if cnt > 5 {
+				unsub()
+				return
+			}
+		}
+	}()
 
 	wg.Wait()
 }

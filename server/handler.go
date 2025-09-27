@@ -14,6 +14,10 @@ type NewCommand struct {
 	Command string `json:"command"`
 }
 
+type NewCommandMessage struct {
+	*Command
+}
+
 func NewCommandHandler(c echo.Context) error {
 	cc := c.(*CockpitContext)
 	newCommand := new(NewCommand)
@@ -22,19 +26,22 @@ func NewCommandHandler(c echo.Context) error {
 		return cc.String(http.StatusBadRequest, "invalid json format");
 	}
 
-	commandInfo, err := cc.DB.NewCommand(newCommand.Command)
+	command, err := cc.DB.NewCommand(newCommand.Command)
 	if err != nil {
 		slog.Error("NewCommandHandler cc.DB.NewCommand", "error", err)
 		return cc.String(http.StatusInternalServerError, "db fail");
 	}
 
-	err = cc.Runner.Run(cc.DB, cc.Bus, commandInfo)
+	msg := NewCommandMessage{command}
+	Pub[any](cc.Bus, "command", msg)
+
+	err = cc.Runner.Run(cc.DB, command)
 	if err != nil {
 		slog.Error("NewCommandHandler cc.Runner.Run", "error", err)
 		return cc.String(http.StatusInternalServerError, "runner fail");
 	}
 
-	return cc.JSON(http.StatusCreated, commandInfo)
+	return cc.JSON(http.StatusCreated, command)
 }
 
 func GetCommandHandler(c echo.Context) error {
@@ -68,6 +75,41 @@ func ListCommandHandler(c echo.Context) error {
 	}
 
 	return cc.JSON(http.StatusOK, commands)
+}
+
+func CommandStreamHandler(c echo.Context) error {
+	cc := c.(*CockpitContext)
+
+	rc, unsub, err := SubChan[any](cc.Bus, "command")
+	if err != nil {
+		slog.Error("LogStreamHandler cc.Runner.AddConsumer", "error", err)
+		return cc.String(http.StatusInternalServerError, "runner fail");
+	}
+
+	w := cc.Response()
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+
+	for {
+		select {
+		case <-cc.Request().Context().Done():
+			unsub()
+			return nil
+		case msg := <-rc:
+			data, err := json.Marshal(msg)
+			if err != nil {
+				slog.Error("CommandStreamHandler json.Marshal(msg)", "error", err)
+				continue
+			}
+			event := Event { Data: data }
+
+			if err := event.MarshalTo(w); err != nil {
+				return err
+			}
+			w.Flush()
+		}
+	}
 }
 
 func LogHandler(c echo.Context) error {

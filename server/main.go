@@ -9,8 +9,9 @@ import (
 
 func main() {
 	bus := NewEventBus()
-	runner := NewRunner()
-	db, err := NewDB("file:cockpit.db")
+	CreateTopic[any](bus, "command")
+	runner := NewRunner(bus)
+	db, err := NewDB("file:cockpit.db", bus)
 	if err != nil {
 		slog.Error("failed to init db", "error", err)
 		return
@@ -28,6 +29,7 @@ func main() {
 	e.POST("/api/v1/command/new", NewCommandHandler)
 	e.GET("/api/v1/command/:id", GetCommandHandler)
 	e.GET("/api/v1/command/list", ListCommandHandler)
+	e.GET("/api/v1/command/stream", CommandStreamHandler)
 	e.GET("/api/v1/command/:id/log/stream", LogStreamHandler)
 	e.GET("/api/v1/command/:id/log", LogHandler)
 

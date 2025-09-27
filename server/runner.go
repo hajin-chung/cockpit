@@ -10,7 +10,7 @@ import (
 )
 
 type Runner interface {
-	Run(db DB, bus *EventBus, command *Command) error
+	Run(db DB, command *Command) error
 }
 
 type Session struct {
@@ -19,18 +19,20 @@ type Session struct {
 }
 
 type CockpitRunner struct {
+	Bus      *EventBus
 	Sessions map[string]*Session
 }
 
-func NewRunner() Runner {
+func NewRunner(bus *EventBus) Runner {
 	sessions := make(map[string]*Session)
 	runner := CockpitRunner{
 		Sessions: sessions,
+		Bus:      bus,
 	}
 	return &runner
 }
 
-func (r *CockpitRunner) Run(db DB, bus *EventBus, command *Command) error {
+func (r *CockpitRunner) Run(db DB, command *Command) error {
 	cmd := exec.Command("bash", "-c", command.Command)
 
 	session := &Session{
@@ -50,17 +52,17 @@ func (r *CockpitRunner) Run(db DB, bus *EventBus, command *Command) error {
 		return err
 	}
 
-	_, err = CreateTopic[*Log](bus, command.Id)
+	_, err = CreateTopic[*Log](r.Bus, command.Id)
 	if err != nil {
 		slog.Error("CockpitRunner.Run", "error", err)
 	}
 
 	var wg sync.WaitGroup
 	wg.Add(2)
-	go session.Drainer(&wg, bus, command, stdout, LOG_STDOUT)
-	go session.Drainer(&wg, bus, command, stderr, LOG_STDERR)
-	go session.Logger(db, bus, command)
-	go session.Waiter(&wg, db, bus, command, cmd)
+	go session.Drainer(&wg, r.Bus, command, stdout, LOG_STDOUT)
+	go session.Drainer(&wg, r.Bus, command, stderr, LOG_STDERR)
+	go session.Logger(db, r.Bus, command)
+	go session.Waiter(&wg, db, r.Bus, command, cmd)
 
 	return nil
 }
@@ -112,10 +114,16 @@ func (s *Session) Logger(db DB, bus *EventBus, command *Command) {
 	}
 }
 
+type UpdateCommandMessage struct {
+	Id     string        `json:"id"`
+	Status CommandStatus `json:"status"`
+}
+
 // resposible for startup and cleanup
 func (s *Session) Waiter(wg *sync.WaitGroup, db DB, bus *EventBus, command *Command, cmd *exec.Cmd) {
 	if err := cmd.Start(); err != nil {
 		slog.Error("failed to start command", "command", s.Command, "error", err)
+
 		db.UpdateStatus(s.Id, COMMAND_ERROR)
 		db.AddLog(&Log{
 			IdGen(),
@@ -124,13 +132,24 @@ func (s *Session) Waiter(wg *sync.WaitGroup, db DB, bus *EventBus, command *Comm
 			fmt.Sprintf("failed to start command %s error: %s", s.Command, err),
 			-1,
 		})
+
+		msg := UpdateCommandMessage{command.Id, COMMAND_ERROR}
+		if err := Pub[any](bus, "command", msg); err != nil {
+			slog.Error("failed to send update command message", "message", msg, "error", err)
+		}
+
 		return
 	}
 	db.UpdateStatus(s.Id, COMMAND_RUNNING)
+	msg := UpdateCommandMessage{command.Id, COMMAND_RUNNING}
+	if err := Pub[any](bus, "command", msg); err != nil {
+		slog.Error("failed to send update command message", "message", msg, "error", err)
+	}
 	wg.Wait()
 
 	if err := cmd.Wait(); err != nil {
 		slog.Error("failed to wait command", "command", s.Command, "error", err)
+
 		db.UpdateStatus(s.Id, COMMAND_ERROR)
 		db.AddLog(&Log{
 			IdGen(),
@@ -139,9 +158,19 @@ func (s *Session) Waiter(wg *sync.WaitGroup, db DB, bus *EventBus, command *Comm
 			fmt.Sprintf("failed to wait command %s error: %s", s.Command, err),
 			-1,
 		})
+
+		msg := UpdateCommandMessage{command.Id, COMMAND_ERROR}
+		if err := Pub[any](bus, "command", msg); err != nil {
+			slog.Error("failed to send update command message", "message", msg, "error", err)
+		}
+
 		return
 	}
 	db.UpdateStatus(s.Id, COMMAND_EXITED)
+	msg = UpdateCommandMessage{command.Id, COMMAND_EXITED}
+	if err := Pub[any](bus, "command", msg); err != nil {
+		slog.Error("failed to send update command message", "message", msg, "error", err)
+	}
 
 	CloseTopic[*Log](bus, command.Id)
 }

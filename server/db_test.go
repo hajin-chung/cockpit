@@ -6,7 +6,8 @@ import (
 )
 
 func TestDB(t *testing.T) {
-	db, err := NewDB("file:test.db")
+	bus := NewEventBus()
+	db, err := NewDB("file:test.db", bus)
 	if err != nil {
 		t.Fatalf("NewDB error: %s\n", err)
 	}
