@@ -51,7 +51,7 @@ const CommandPane = () => {
 	const fetcher = async (prevLogs: Log[]) => {
 		const before = prevLogs.length != 0 ? prevLogs.at(-1)!.id : "";
 		const logs = await api.getLog(params.id, before, 50);
-		if (logs.length < 50) setShowLoadMore(false);
+		setShowLoadMore(logs.length === 50);
 		return [...prevLogs, ...logs];
 	};
 
