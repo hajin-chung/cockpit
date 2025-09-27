@@ -7,5 +7,5 @@ command runner with logs
 
 - [x] implement event bus for better pub sub stuff
 - [ ] better serverside cleanup
-- [ ] better pub sub api
+- [x] better pub sub api
 - [ ] stream command events (new command, status update)

@@ -55,6 +55,7 @@ type CockpitDB struct {
 }
 
 func NewDB(dataSourceName string) (DB, error) {
+	dataSourceName += "?_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)"
 	sqlDB, err := sql.Open("sqlite", dataSourceName)
 	if err != nil {
 		slog.Error("cannot open `cockpit.db` database file", "error", err)
