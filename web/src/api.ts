@@ -4,9 +4,9 @@ type NewCommand = {
 	command: string;
 };
 
-const API_ENDPOINT = import.meta.env.DEV ? "https://dev1.deps.me" : "";
+export const API_ENDPOINT = import.meta.env.DEV ? "https://dev1.deps.me" : "";
 
-async function createCommand(command: string): Promise<Command> {
+export async function createCommand(command: string): Promise<Command> {
 	const payload: NewCommand = { command };
 	const res = await fetch(`${API_ENDPOINT}/api/v1/command/new`, {
 		method: "POST",
@@ -19,7 +19,7 @@ async function createCommand(command: string): Promise<Command> {
 	return res.json();
 }
 
-async function getCommand(id: string): Promise<Command> {
+export async function getCommand(id: string): Promise<Command> {
 	const res = await fetch(`${API_ENDPOINT}/api/v1/command/${id}`);
 	if (!res.ok) {
 		throw new Error("Failed to get command");
@@ -27,7 +27,7 @@ async function getCommand(id: string): Promise<Command> {
 	return res.json();
 }
 
-async function getCommandList(
+export async function getCommandList(
 	before: string,
 	limit: number,
 ): Promise<Command[]> {
@@ -40,7 +40,7 @@ async function getCommandList(
 	return res.json();
 }
 
-async function getLog(
+export async function getLog(
 	id: string,
 	before: string,
 	limit: number,
@@ -54,12 +54,12 @@ async function getLog(
 	return res.json();
 }
 
-type Stream<T> = {
+export type Stream<T> = {
 	iterator: AsyncIterable<T>,
 	source: EventSource,
 };
 
-function createStream<T>(sourceUrl: string): Stream<T> {
+export function createStream<T>(sourceUrl: string): Stream<T> {
 	const eventSource = new EventSource(sourceUrl);
 	const queue: T[] = [];
 	let resolve: ((v: IteratorResult<T>) => void) | null = null;
@@ -108,5 +108,3 @@ function createStream<T>(sourceUrl: string): Stream<T> {
 
 	return { iterator, source: eventSource };
 }
-
-export { createCommand, getCommand, getCommandList, getLog, createStream, API_ENDPOINT };

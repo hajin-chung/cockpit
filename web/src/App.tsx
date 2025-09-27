@@ -1,13 +1,13 @@
-import { Router, Route } from "@solidjs/router";
-import { CommandPage, NewCommandPage } from "./Pages";
+import { HashRouter, Route } from "@solidjs/router";
+import { CommandPane, NewCommandPane } from "./Panes";
+import { Layout } from "./Layout";
 
 function App() {
 	return (
-		<Router>
-			<Route path="/" component={NewCommandPage} />
-			<Route path="/new" component={NewCommandPage} />
-			<Route path="/:id" component={CommandPage} />
-		</Router>
+		<HashRouter root={Layout}>
+			<Route path="/new" component={NewCommandPane} />
+			<Route path="/:id" component={CommandPane} />
+		</HashRouter>
 	);
 }
 

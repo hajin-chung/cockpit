@@ -1,30 +1,36 @@
-import {
-	createSignal,
-	createEffect,
-	createMemo,
-	type Component,
-	onCleanup,
-} from "solid-js";
+import { createSignal, createEffect, createMemo, onCleanup } from "solid-js";
 import { A } from "@solidjs/router";
 import * as api from "./api";
-import type { Command, Log } from "./schema";
+import type { Command } from "./schema";
 
 function CommandList() {
 	const [commandList, setCommandList] = createSignal<Command[]>([]);
+	const stream = createMemo(() => {
+		const ret = api.createStream<Command>(
+			`${api.API_ENDPOINT}/api/v1/command/stream`,
+		);
+		onCleanup(() => ret.source.close());
+		return ret;
+	});
+	const fetcher = async (prev: Command[]) => {
+		if (prev.length === 0)
+			return await api.getCommandList("", 50);
+		else {
+			const commands = await api.getCommandList(prev.at(-1)!.id, 50);
+			return [...prev, ...commands]
+		}
+	}
+
+	// const loadMore = () => fetcher(commandList()).then(setCommandList);
 
 	createEffect(() => {
-		const stream = createMemo(() =>
-			api.createStream<Command>(`${api.API_ENDPOINT}/api/v1/command/stream`),
-		);
-
 		(async () => {
-			const prevCommands = await api.getCommandList("", 50);
+			const prevCommands = await fetcher([]);
 			setCommandList(prevCommands);
 
 			for await (const command of stream().iterator) {
 				setCommandList((prevCommands) => {
 					const idx = prevCommands.findIndex((c) => c.id === command.id);
-					console.log(idx, prevCommands, command);
 					if (idx < 0) {
 						return [command, ...prevCommands];
 					} else {
@@ -34,10 +40,6 @@ function CommandList() {
 				});
 			}
 		})();
-
-		onCleanup(() => {
-			stream().source.close();
-		});
 	});
 
 	return (
@@ -64,43 +66,4 @@ function CommandList() {
 	);
 }
 
-type LogListProps = {
-	commandId: () => string;
-};
-
-const LogList: Component<LogListProps> = ({ commandId }) => {
-	const [logs, setLogs] = createSignal<Log[]>([]);
-
-	createEffect(() => {
-		const id = commandId();
-		const stream = createMemo(() =>
-			api.createStream<Log>(
-				`${api.API_ENDPOINT}/api/v1/command/${id}/log/stream`,
-			),
-		);
-
-		(async () => {
-			const prevLogs = await api.getLog(commandId(), "", 50);
-			setLogs(prevLogs.reverse());
-			for await (const log of stream().iterator) {
-				setLogs((prevLogs) => [...prevLogs, log]);
-			}
-		})();
-
-		onCleanup(() => {
-			stream().source.close();
-		});
-	});
-
-	return (
-		<div class="w-full h-full overflow-y-auto">
-			<div class="w-full flex flex-col gap-2">
-				{logs().map((log) => (
-					<div>{log.content}</div>
-				))}
-			</div>
-		</div>
-	);
-};
-
-export { CommandList, LogList };
+export { CommandList };
