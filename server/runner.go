@@ -114,11 +114,6 @@ func (s *Session) Logger(db DB, bus *EventBus, command *Command) {
 	}
 }
 
-type UpdateCommandMessage struct {
-	Id     string        `json:"id"`
-	Status CommandStatus `json:"status"`
-}
-
 // resposible for startup and cleanup
 func (s *Session) Waiter(wg *sync.WaitGroup, db DB, bus *EventBus, command *Command, cmd *exec.Cmd) {
 	if err := cmd.Start(); err != nil {
@@ -133,7 +128,7 @@ func (s *Session) Waiter(wg *sync.WaitGroup, db DB, bus *EventBus, command *Comm
 			-1,
 		})
 
-		msg := UpdateCommandMessage{command.Id, COMMAND_ERROR}
+		msg := CommandMessage(&Command{Id: s.Id, Status: COMMAND_ERROR}, COMMAND_UPDATE)
 		if err := Pub[any](bus, "command", msg); err != nil {
 			slog.Error("failed to send update command message", "message", msg, "error", err)
 		}
@@ -141,7 +136,7 @@ func (s *Session) Waiter(wg *sync.WaitGroup, db DB, bus *EventBus, command *Comm
 		return
 	}
 	db.UpdateStatus(s.Id, COMMAND_RUNNING)
-	msg := UpdateCommandMessage{command.Id, COMMAND_RUNNING}
+	msg := CommandMessage(&Command{Id: s.Id, Status: COMMAND_RUNNING}, COMMAND_UPDATE)
 	if err := Pub[any](bus, "command", msg); err != nil {
 		slog.Error("failed to send update command message", "message", msg, "error", err)
 	}
@@ -159,7 +154,7 @@ func (s *Session) Waiter(wg *sync.WaitGroup, db DB, bus *EventBus, command *Comm
 			-1,
 		})
 
-		msg := UpdateCommandMessage{command.Id, COMMAND_ERROR}
+		msg := CommandMessage(&Command{Id: s.Id, Status: COMMAND_ERROR}, COMMAND_UPDATE)
 		if err := Pub[any](bus, "command", msg); err != nil {
 			slog.Error("failed to send update command message", "message", msg, "error", err)
 		}
@@ -167,7 +162,7 @@ func (s *Session) Waiter(wg *sync.WaitGroup, db DB, bus *EventBus, command *Comm
 		return
 	}
 	db.UpdateStatus(s.Id, COMMAND_EXITED)
-	msg = UpdateCommandMessage{command.Id, COMMAND_EXITED}
+	msg = CommandMessage(&Command{Id: s.Id, Status: COMMAND_EXITED}, COMMAND_UPDATE)
 	if err := Pub[any](bus, "command", msg); err != nil {
 		slog.Error("failed to send update command message", "message", msg, "error", err)
 	}

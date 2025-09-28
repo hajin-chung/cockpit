@@ -5,6 +5,12 @@ enum CommandStatus {
 	ERROR = "ERROR",
 }
 
+enum CommandEventType {
+	CREATE = "create",
+	UPDATE = "update",
+	DELETE = "delete",
+}
+
 enum LogFD {
 	STDOUT = 1,
 	STDERR = 2,
@@ -18,6 +24,10 @@ type Command = {
 	status: CommandStatus;
 };
 
+type CommandEvent = Command & {
+	type: CommandEventType;
+};
+
 type Log = {
 	id: string;
 	commandId: string;
@@ -26,4 +36,5 @@ type Log = {
 	fd: LogFD;
 };
 
-export type { Log, Command, CommandStatus, LogFD };
+export type { Log, Command, CommandStatus, LogFD, CommandEvent };
+export { CommandEventType };

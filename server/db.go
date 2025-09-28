@@ -189,7 +189,6 @@ func (db *CockpitDB) GetCommand(id string) (*Command, error) {
 }
 
 func (db *CockpitDB) ListCommands(before string, n uint) ([]Command, error) {
-	// TODO: think about after and n
 	if len(before) == 0 {
 		before = MAX_ID
 	}

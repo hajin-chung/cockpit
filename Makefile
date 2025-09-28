@@ -15,3 +15,5 @@ dev:
 
 clean:
 	rm -r build
+	rm server/cockpit.db*
+	rm server/*.db-wal
