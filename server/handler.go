@@ -73,6 +73,54 @@ func ListCommandHandler(c echo.Context) error {
 	return cc.JSON(http.StatusOK, commands)
 }
 
+// type StopCommand struct {
+// 	Command string `json:"command"`
+// }
+//
+// func StopCommandHandler(c echo.Context) error {
+// 	cc := c.(*CockpitContext)
+// 	stopCommand := new(StopCommand)
+// 	if err := cc.Bind(stopCommand); err != nil {
+// 		slog.Error("StopCommandHandler cc.Bind", "error", err)
+// 		return cc.String(http.StatusBadRequest, "invalid json format")
+// 	}
+// }
+
+type DeleteCommand struct {
+	Command string `json:"command"`
+}
+
+func DeleteCommandHandler(c echo.Context) error {
+	cc := c.(*CockpitContext)
+	deleteCommand := new(DeleteCommand)
+	if err := cc.Bind(deleteCommand); err != nil {
+		slog.Error("NewCommandHandler cc.Bind", "error", err)
+		return cc.String(http.StatusBadRequest, "invalid json format")
+	}
+
+	id := deleteCommand.Command
+	command, err := cc.DB.GetCommand(id)
+	if err != nil {
+		slog.Error("DeleteCommandHandler cc.DB.GetCommand", "error", err)
+		return cc.String(http.StatusInternalServerError, "db fail")
+	}
+
+	if !(command.Status == COMMAND_ERROR || command.Status == COMMAND_EXITED) {
+		return cc.String(http.StatusBadRequest, "command still running")
+	}
+
+	err = cc.DB.DeleteCommand(id)
+	if err != nil {
+		slog.Error("DeleteCommandHandler cc.DB.DeleteCommand", "error", err)
+		return cc.String(http.StatusInternalServerError, "db fail")
+	}
+
+	msg := CommandMessage(&Command{Id: deleteCommand.Command}, COMMAND_DELETE)
+	Pub[any](cc.Bus, "command", msg)
+
+	return cc.NoContent(http.StatusOK)
+}
+
 func CommandStreamHandler(c echo.Context) error {
 	cc := c.(*CockpitContext)
 

@@ -36,5 +36,5 @@ type Log = {
 	fd: LogFD;
 };
 
-export type { Log, Command, CommandStatus, LogFD, CommandEvent };
-export { CommandEventType };
+export type { Log, Command, LogFD, CommandEvent };
+export { CommandEventType, CommandStatus };

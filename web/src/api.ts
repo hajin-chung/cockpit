@@ -4,6 +4,10 @@ type NewCommand = {
 	command: string;
 };
 
+type DeleteCommand = {
+	command: string;
+};
+
 export const API_ENDPOINT = import.meta.env.DEV ? "https://dev1.deps.me" : "";
 
 export async function createCommand(command: string): Promise<Command> {
@@ -40,6 +44,19 @@ export async function getCommandList(
 	return res.json();
 }
 
+export async function deleteCommand(id: string) {
+	const payload: DeleteCommand = { command: id };
+	const res = await fetch(`${API_ENDPOINT}/api/v1/command/${id}`, {
+		method: "DELETE",
+		body: JSON.stringify(payload),
+		headers: { "Content-Type": "application/json" },
+	});
+	if (!res.ok) {
+		throw new Error("failed to delete command");
+	}
+	return;
+}
+
 export async function getLog(
 	id: string,
 	before: string,
@@ -55,8 +72,8 @@ export async function getLog(
 }
 
 export type Stream<T> = {
-	iterator: AsyncIterable<T>,
-	source: EventSource,
+	iterator: AsyncIterable<T>;
+	source: EventSource;
 };
 
 export function createStream<T>(sourceUrl: string): Stream<T> {

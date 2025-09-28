@@ -45,6 +45,7 @@ type DB interface {
 	NewCommand(command string) (*Command, error)
 	GetCommand(id string) (*Command, error)
 	ListCommands(before string, n uint) ([]Command, error)
+	DeleteCommand(id string) error
 	AddLog(log *Log) error
 	GetLogs(commandId string, before string, n uint) ([]Log, error)
 	UpdateStatus(id string, status CommandStatus) error
@@ -64,7 +65,7 @@ func NewDB(dataSourceName string, bus *EventBus) (DB, error) {
 	}
 
 	db := CockpitDB{
-		DB: sqlDB,
+		DB:  sqlDB,
 		Bus: bus,
 	}
 	err = db.Init()
@@ -114,6 +115,10 @@ const UPDATE_STATUS_QUERY = `
 UPDATE command
 SET status = ?
 WHERE id = ?;
+`
+const DELETE_COMMAND_QUERY = `
+DELETE FROM command
+WHERE id = $1;
 `
 const INSERT_LOG_QUERY = `
 INSERT INTO log (id, command_id, created_at, content, fd)
@@ -215,6 +220,15 @@ func (db *CockpitDB) ListCommands(before string, n uint) ([]Command, error) {
 		return commands, err
 	}
 	return commands, nil
+}
+
+func (db *CockpitDB) DeleteCommand(id string) error {
+	_, err := db.Exec(DELETE_COMMAND_QUERY, id)
+	if err != nil {
+		slog.Error("failed to delete command", "error", err)
+		return err
+	}
+	return nil
 }
 
 func (db *CockpitDB) AddLog(log *Log) error {

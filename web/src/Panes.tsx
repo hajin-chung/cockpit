@@ -1,7 +1,9 @@
-import { createEffect, createMemo, createSignal, onCleanup } from "solid-js";
+import { createEffect, createMemo, createSignal } from "solid-js";
 import * as api from "./api";
 import { useNavigate, useParams } from "@solidjs/router";
-import type { Log } from "./schema";
+import { commandStore } from "./store";
+import { LogList } from "./Components";
+import { CommandStatus } from "./schema";
 
 const NewCommandPane = () => {
 	const navigate = useNavigate();
@@ -38,51 +40,34 @@ const NewCommandPane = () => {
 };
 
 const CommandPane = () => {
+	const navigate = useNavigate();
 	const params = useParams();
-	const [logs, setLogs] = createSignal<Log[]>([]);
-	const [showLoadMore, setShowLoadMore] = createSignal(true);
-	const stream = createMemo(() => {
-		const ret = api.createStream<Log>(
-			`${api.API_ENDPOINT}/api/v1/command/${params.id}/log/stream`,
-		);
-		onCleanup(() => ret.source.close());
-		return ret;
-	});
-	const fetcher = async (prevLogs: Log[]) => {
-		const before = prevLogs.length != 0 ? prevLogs.at(-1)!.id : "";
-		const logs = await api.getLog(params.id, before, 50);
-		setShowLoadMore(logs.length === 50);
-		return [...prevLogs, ...logs];
+	const command = createMemo(() =>
+		commandStore.find((c) => c.id === params.id),
+	);
+
+	const handleDelete = () => {
+		api
+			.deleteCommand(params.id)
+			.then(() => navigate("/"))
+			.catch((e) => console.error(e));
 	};
 
-	const loadMore = () => fetcher(logs()).then(setLogs);
-
-	createEffect(() => {
-		(async () => {
-			const prevLogs = await fetcher([]);
-			setLogs(prevLogs);
-			for await (const log of stream().iterator) {
-				setLogs((prevLogs) => [log, ...prevLogs]);
-			}
-		})();
-	});
-
 	return (
-		// <div class="w-full h-full overflow-y-auto">
-		<div class="w-full h-full flex overflow-y-auto gap-2 flex-col-reverse">
-			{logs().map((log) => (
-				<div>{log.content}</div>
-			))}
-			{showLoadMore() && (
-				<button
-					onclick={loadMore}
-					class="p-2 hover:bg-neutral-700 transition-all rounded-lg self-center hover:cursor-pointer"
-				>
-					Load More
-				</button>
-			)}
+		<div class="w-full h-full">
+			<div>
+				<LogList id={params.id} />
+				{(command()?.status === CommandStatus.EXITED ||
+					command()?.status === CommandStatus.ERROR) && (
+					<button
+						class="p-2 bg-violet-900 hover:bg-violet-800 transition-all rounded-lg self-end"
+						onClick={handleDelete}
+					>
+						Delete
+					</button>
+				)}
+			</div>
 		</div>
-		// </div>
 	);
 };
 

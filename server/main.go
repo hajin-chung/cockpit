@@ -29,6 +29,7 @@ func main() {
 	e.POST("/api/v1/command/new", NewCommandHandler)
 	e.GET("/api/v1/command/:id", GetCommandHandler)
 	e.GET("/api/v1/command/list", ListCommandHandler)
+	e.DELETE("/api/v1/command/:id", DeleteCommandHandler)
 	e.GET("/api/v1/command/stream", CommandStreamHandler)
 	e.GET("/api/v1/command/:id/log/stream", LogStreamHandler)
 	e.GET("/api/v1/command/:id/log", LogHandler)

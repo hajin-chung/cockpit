@@ -10,8 +10,9 @@ command runner with logs
 - [x] stream command events (new command, status update)
 - [x] web infinite scroll (with load more button) + sticky scroll
 - [x] think about better command event message type, go's type system is a bit weak compared to rust
-- [ ] implement command delete
+- [x] implement command delete
 - [ ] better serverside cleanup
 - [ ] runner and eventbus mutex
 - [ ] better ui
-
+- [ ] server side error handling (better error returns)
+- [ ] web toast on api calls
