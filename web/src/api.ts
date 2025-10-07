@@ -44,6 +44,19 @@ export async function getCommandList(
 	return res.json();
 }
 
+export async function stopCommand(id: string) {
+	const payload: DeleteCommand = { command: id };
+	const res = await fetch(`${API_ENDPOINT}/api/v1/command/${id}/stop`, {
+		method: "POST",
+		body: JSON.stringify(payload),
+		headers: { "Content-Type": "application/json" },
+	});
+	if (!res.ok) {
+		throw new Error("failed to delete command");
+	}
+	return;
+}
+
 export async function deleteCommand(id: string) {
 	const payload: DeleteCommand = { command: id };
 	const res = await fetch(`${API_ENDPOINT}/api/v1/command/${id}`, {

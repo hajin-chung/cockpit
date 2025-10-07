@@ -1,4 +1,4 @@
-import { createEffect, createMemo, createSignal } from "solid-js";
+import { createMemo, createSignal } from "solid-js";
 import * as api from "./api";
 import { useNavigate, useParams } from "@solidjs/router";
 import { commandStore } from "./store";
@@ -45,6 +45,9 @@ const CommandPane = () => {
 	const command = createMemo(() =>
 		commandStore.find((c) => c.id === params.id),
 	);
+	const statusOk = () =>
+		command()?.status === CommandStatus.EXITED ||
+		command()?.status === CommandStatus.ERROR;
 
 	const handleDelete = () => {
 		api
@@ -53,17 +56,27 @@ const CommandPane = () => {
 			.catch((e) => console.error(e));
 	};
 
+	const handleStop = () => {
+		api.stopCommand(params.id).catch((e) => console.error(e));
+	};
+
 	return (
 		<div class="w-full h-full">
 			<div>
 				<LogList id={params.id} />
-				{(command()?.status === CommandStatus.EXITED ||
-					command()?.status === CommandStatus.ERROR) && (
+				{statusOk() ? (
 					<button
 						class="p-2 bg-violet-900 hover:bg-violet-800 transition-all rounded-lg self-end"
 						onClick={handleDelete}
 					>
 						Delete
+					</button>
+				) : (
+					<button
+						class="p-2 bg-violet-900 hover:bg-violet-800 transition-all rounded-lg self-end"
+						onClick={handleStop}
+					>
+						Stop
 					</button>
 				)}
 			</div>

@@ -11,11 +11,12 @@ import (
 
 type Runner interface {
 	Run(db DB, command *Command) error
+	Stop(id string) error
 }
 
 type Session struct {
 	*Command
-	Consumers *Log
+	cmd *exec.Cmd
 }
 
 type CockpitRunner struct {
@@ -37,6 +38,7 @@ func (r *CockpitRunner) Run(db DB, command *Command) error {
 
 	session := &Session{
 		Command: command,
+		cmd:     cmd,
 	}
 	r.Sessions[command.Id] = session
 
@@ -62,9 +64,18 @@ func (r *CockpitRunner) Run(db DB, command *Command) error {
 	go session.Drainer(&wg, r.Bus, command, stdout, LOG_STDOUT)
 	go session.Drainer(&wg, r.Bus, command, stderr, LOG_STDERR)
 	go session.Logger(db, r.Bus, command)
-	go session.Waiter(&wg, db, r.Bus, command, cmd)
+	go session.Waiter(&wg, db, r.Bus, command)
 
 	return nil
+}
+
+func (r *CockpitRunner) Stop(id string) error {
+	session := r.Sessions[id]
+	if session == nil {
+		return fmt.Errorf("CockpitRunner no session with id %s\n", id)
+	}
+
+	return session.Stop()
 }
 
 func SplitLines(buf []byte) ([]string, int) {
@@ -115,8 +126,15 @@ func (s *Session) Logger(db DB, bus *EventBus, command *Command) {
 }
 
 // resposible for startup and cleanup
-func (s *Session) Waiter(wg *sync.WaitGroup, db DB, bus *EventBus, command *Command, cmd *exec.Cmd) {
-	if err := cmd.Start(); err != nil {
+func (s *Session) Waiter(wg *sync.WaitGroup, db DB, bus *EventBus, command *Command) {
+	defer func() {
+		err := CloseTopic[*Log](bus, command.Id)
+		if err != nil {
+			slog.Error("Session.Waiter", "error", err)
+		}
+	}()
+
+	if err := s.cmd.Start(); err != nil {
 		slog.Error("failed to start command", "command", s.Command, "error", err)
 
 		db.UpdateStatus(s.Id, COMMAND_ERROR)
@@ -142,7 +160,7 @@ func (s *Session) Waiter(wg *sync.WaitGroup, db DB, bus *EventBus, command *Comm
 	}
 	wg.Wait()
 
-	if err := cmd.Wait(); err != nil {
+	if err := s.cmd.Wait(); err != nil {
 		slog.Error("failed to wait command", "command", s.Command, "error", err)
 
 		db.UpdateStatus(s.Id, COMMAND_ERROR)
@@ -166,7 +184,9 @@ func (s *Session) Waiter(wg *sync.WaitGroup, db DB, bus *EventBus, command *Comm
 	if err := Pub[any](bus, "command", msg); err != nil {
 		slog.Error("failed to send update command message", "message", msg, "error", err)
 	}
+}
 
-	CloseTopic[*Log](bus, command.Id)
+func (s *Session) Stop() error {
+	return s.cmd.Process.Kill()
 }
 

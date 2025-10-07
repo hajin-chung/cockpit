@@ -24,7 +24,9 @@ func NewTopic[T any]() *Topic[T] {
 }
 
 func (t *Topic[T]) Close() {
-	// TODO: cleanup
+	for _, c := range t.channels {
+		close(c)
+	}
 }
 
 func (t *Topic[T]) Pub(v T) {

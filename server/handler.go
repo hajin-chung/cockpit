@@ -73,18 +73,27 @@ func ListCommandHandler(c echo.Context) error {
 	return cc.JSON(http.StatusOK, commands)
 }
 
-// type StopCommand struct {
-// 	Command string `json:"command"`
-// }
-//
-// func StopCommandHandler(c echo.Context) error {
-// 	cc := c.(*CockpitContext)
-// 	stopCommand := new(StopCommand)
-// 	if err := cc.Bind(stopCommand); err != nil {
-// 		slog.Error("StopCommandHandler cc.Bind", "error", err)
-// 		return cc.String(http.StatusBadRequest, "invalid json format")
-// 	}
-// }
+type StopCommand struct {
+	Command string `json:"command"`
+}
+
+func StopCommandHandler(c echo.Context) error {
+	cc := c.(*CockpitContext)
+	stopCommand := new(StopCommand)
+	if err := cc.Bind(stopCommand); err != nil {
+		slog.Error("StopCommandHandler cc.Bind", "error", err)
+		return cc.String(http.StatusBadRequest, "invalid json format")
+	}
+
+	id := stopCommand.Command
+	err := cc.Runner.Stop(id)
+	if err != nil {
+		slog.Error("StopCommandHandler cc.Runner.Stop", "error", err)
+		return cc.String(http.StatusInternalServerError, "runner fail")
+	}
+
+	return cc.NoContent(http.StatusOK)
+}
 
 type DeleteCommand struct {
 	Command string `json:"command"`
