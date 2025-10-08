@@ -42,6 +42,7 @@ const NewCommandPane = () => {
 const CommandPane = () => {
 	const navigate = useNavigate();
 	const params = useParams();
+	const id = createMemo(() => params.id)
 	const command = createMemo(() =>
 		commandStore.find((c) => c.id === params.id),
 	);
@@ -61,25 +62,23 @@ const CommandPane = () => {
 	};
 
 	return (
-		<div class="w-full h-full">
-			<div>
-				<LogList id={params.id} />
-				{statusOk() ? (
-					<button
-						class="p-2 bg-violet-900 hover:bg-violet-800 transition-all rounded-lg self-end"
-						onClick={handleDelete}
-					>
-						Delete
-					</button>
-				) : (
-					<button
-						class="p-2 bg-violet-900 hover:bg-violet-800 transition-all rounded-lg self-end"
-						onClick={handleStop}
-					>
-						Stop
-					</button>
-				)}
-			</div>
+		<div class="w-full h-full flex flex-col gap-2">
+			<LogList id={id} />
+			{statusOk() ? (
+				<button
+					class="p-2 bg-violet-900 hover:bg-violet-800 transition-all rounded-lg self-end"
+					onClick={handleDelete}
+				>
+					Delete
+				</button>
+			) : (
+				<button
+					class="p-2 bg-violet-900 hover:bg-violet-800 transition-all rounded-lg self-end"
+					onClick={handleStop}
+				>
+					Stop
+				</button>
+			)}
 		</div>
 	);
 };

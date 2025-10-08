@@ -3,6 +3,7 @@ import {
 	createMemo,
 	createSignal,
 	onCleanup,
+	For,
 	type Component,
 } from "solid-js";
 import { A } from "@solidjs/router";
@@ -42,17 +43,17 @@ function CommandList() {
 				switch (command.type) {
 					case CommandEventType.CREATE:
 						setCommandStore((prev) => [command, ...prev]);
-						break
+						break;
 					case CommandEventType.UPDATE:
 						setCommandStore(
 							(c) => c.id === command.id,
 							"status",
 							command.status,
 						);
-						break
+						break;
 					case CommandEventType.DELETE:
 						setCommandStore((prev) => prev.filter((c) => c.id !== command.id));
-						break
+						break;
 				}
 			}
 		})();
@@ -83,7 +84,7 @@ function CommandList() {
 }
 
 type LogListProps = {
-	id: string;
+	id: () => string;
 };
 
 const LogList: Component<LogListProps> = ({ id }) => {
@@ -92,14 +93,14 @@ const LogList: Component<LogListProps> = ({ id }) => {
 
 	const stream = createMemo(() => {
 		const ret = api.createStream<Log>(
-			`${api.API_ENDPOINT}/api/v1/command/${id}/log/stream`,
+			`${api.API_ENDPOINT}/api/v1/command/${id()}/log/stream`,
 		);
 		onCleanup(() => ret.source.close());
 		return ret;
 	});
 	const fetcher = async (prevLogs: Log[]) => {
 		const before = prevLogs.length != 0 ? prevLogs.at(-1)!.id : "";
-		const logs = await api.getLog(id, before, 50);
+		const logs = await api.getLog(id(), before, 50);
 		setShowLoadMore(logs.length === 50);
 		return [...prevLogs, ...logs];
 	};
@@ -117,10 +118,8 @@ const LogList: Component<LogListProps> = ({ id }) => {
 	});
 
 	return (
-		<div class="w-full h-full flex overflow-y-auto gap-2 flex-col-reverse">
-			{logs().map((log) => (
-				<div>{log.content}</div>
-			))}
+		<div class="w-full min-h-0 flex gap-2 flex-col-reverse overflow-y-auto">
+			<For each={logs()}>{(log) => <div>{log.content}</div>}</For>
 			{showLoadMore() && (
 				<button
 					onclick={loadMore}
