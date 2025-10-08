@@ -7,12 +7,13 @@ run:
 
 build:
 	mkdir -p build
-	cd server && go build -o ../build
 	cd web && npm run build
+	cd server && go build -ldflags "-linkmode 'external' -extldflags '-static'" -tags netgo,osusergo -o ../build .
 
 dev:
 	rm server/cockpit.db* & cd web && npm run dev & cd server && go run .
 
 clean:
 	rm -r build
+	rm -r server/build
 	rm server/*.db server/*.db-wal server/*.db-shm

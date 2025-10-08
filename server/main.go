@@ -1,11 +1,16 @@
 package main
 
 import (
+	_ "embed"
 	"log/slog"
+	"net/http"
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 )
+
+//go:embed build/index.html
+var IndexHTML string
 
 func main() {
 	bus := NewEventBus()
@@ -23,7 +28,6 @@ func main() {
 	e.Use(middleware.Recover())
 	e.Use(middleware.CORSWithConfig(middleware.DefaultCORSConfig))
 	e.Use(CockpitContextMiddleware(runner, db, bus))
-	e.Static("/", "static")
 
 	e.GET("/test/sse", TestSSE)
 	e.POST("/api/v1/command/new", NewCommandHandler)
@@ -35,7 +39,12 @@ func main() {
 	e.GET("/api/v1/command/:id/log/stream", LogStreamHandler)
 	e.GET("/api/v1/command/:id/log", LogHandler)
 
+	e.GET("/*", func(c echo.Context) error {
+		return c.HTML(http.StatusOK, IndexHTML)
+	})
+
 	if err := e.Start(":4000"); err != nil {
 		slog.Error("failed to start server", "error", err)
 	}
 }
+
