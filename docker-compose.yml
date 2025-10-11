@@ -1,0 +1,10 @@
+services:
+  cockpit:
+    image: cockpit:dev
+    restart: unless-stopped
+    build: .
+    container_name: cockpit
+    ports:
+      - "2133:4000"
+    volumes:
+      - /mnt/:/mnt/
