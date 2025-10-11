@@ -2,11 +2,15 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"io"
 	"log/slog"
+	"os"
 	"os/exec"
+	"strconv"
 	"sync"
+	"syscall"
 )
 
 type Runner interface {
@@ -16,7 +20,8 @@ type Runner interface {
 
 type Session struct {
 	*Command
-	cmd *exec.Cmd
+	cmd    *exec.Cmd
+	cancel context.CancelFunc
 }
 
 type CockpitRunner struct {
@@ -34,11 +39,14 @@ func NewRunner(bus *EventBus) Runner {
 }
 
 func (r *CockpitRunner) Run(db DB, command *Command) error {
-	cmd := exec.Command("bash", "-c", command.Command)
+	ctx, cancel := context.WithCancel(context.Background())
+	cmd := exec.CommandContext(ctx, "bash", "-c", command.Command)
 
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	session := &Session{
 		Command: command,
 		cmd:     cmd,
+		cancel:  cancel,
 	}
 	r.Sessions[command.Id] = session
 
@@ -187,6 +195,72 @@ func (s *Session) Waiter(wg *sync.WaitGroup, db DB, bus *EventBus, command *Comm
 }
 
 func (s *Session) Stop() error {
-	return s.cmd.Process.Kill()
+	slog.Info("Trying to kill cmd", "process pid", s.cmd.Process.Pid)
+
+	if s.cmd != nil && s.cmd.Process != nil {
+		pgid, err := syscall.Getpgid(s.cmd.Process.Pid)
+		if err != nil {
+			return err
+		}
+
+		slog.Info("Stop", "cmd", "kill -9", "pgid", pgid)
+		cmd := exec.Command("kill", "-9", "--", fmt.Sprintf("-%d", pgid))
+		cmd.Stderr = os.Stderr
+		cmd.Stdout = os.Stdout
+		if err := cmd.Run(); err != nil {
+			return err
+		}
+	}
+
+	if s.cmd != nil && s.cmd.Process != nil {
+		slog.Info("Stop", "cmd", "kill -9")
+		cmd := exec.Command("kill", "-9", strconv.Itoa(s.cmd.Process.Pid))
+		cmd.Stderr = os.Stderr
+		cmd.Stdout = os.Stdout
+		if err := cmd.Run(); err != nil {
+			return err
+		}
+	}
+	if s.cmd != nil && s.cmd.Process != nil {
+		slog.Info("Stop", "cmd", "kill")
+		cmd := exec.Command("kill", strconv.Itoa(s.cmd.Process.Pid))
+		cmd.Stderr = os.Stderr
+		cmd.Stdout = os.Stdout
+		if err := cmd.Run(); err != nil {
+			return err
+		}
+	}
+	if s.cmd != nil && s.cmd.Process != nil {
+		slog.Info("Stop", "cmd", "s.cmd.Process.Kill")
+		if err := s.cmd.Process.Kill(); err != nil {
+			return err
+		}
+	}
+	if s.cmd != nil && s.cmd.Process != nil {
+		slog.Info("Stop", "cmd", "s.cmd.Process.Signal(syscall.SIGINT)")
+		if err := s.cmd.Process.Signal(syscall.SIGINT); err != nil {
+			return err
+		}
+	}
+	if s.cmd != nil && s.cmd.Process != nil {
+		slog.Info("Stop", "cmd", "s.cmd.Process.Signal(syscall.SIGKILL)")
+		if err := s.cmd.Process.Signal(syscall.SIGKILL); err != nil {
+			return err
+		}
+	}
+	if s.cmd != nil && s.cmd.Process != nil {
+		slog.Info("Stop", "cmd", "s.cmd.Process.Signal(syscall.SIGTERM)")
+		if err := s.cmd.Process.Signal(syscall.SIGTERM); err != nil {
+			return err
+		}
+	}
+	if s.cmd != nil {
+		slog.Info("Stop", "cmd", "s.cmd.Cancel")
+		if err := s.cmd.Cancel(); err != nil {
+			return err
+		}
+	}
+	s.cancel()
+	return nil
 }
 
